@@ -57,3 +57,5 @@ frontend-web/.env
 # Local database/mock data files
 backend/data/
 
+# Deployment scripts containing API keys/tokens
+scratch/

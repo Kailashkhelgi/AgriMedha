@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage';
 import { type Lang, LANGUAGES, t } from './i18n';
 import AIChatbot from './components/AIChatbot';
 
+
 type Page =
   | 'home' | 'register' | 'login'
   | 'dashboard' | 'profile' | 'soil-profile' | 'crop-advisory'

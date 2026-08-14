@@ -156,21 +156,6 @@ export const imageApi = {
   },
 };
 
-// ── Voice ─────────────────────────────────────────────────────────────────────
-export const voiceApi = {
-  stt: (audioBlob: Blob, language: string) => {
-    const form = new FormData();
-    form.append('audio', audioBlob);
-    form.append('language', language);
-    return apiClient.post('/voice/stt', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-
-  tts: (text: string, language: string) =>
-    apiClient.post('/voice/tts', { text, language }, { responseType: 'blob' }),
-};
-
 // ── Feedback ──────────────────────────────────────────────────────────────────
 export const feedbackApi = {
   submit: (sessionId: string, rating: number) =>

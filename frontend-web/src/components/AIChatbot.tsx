@@ -30,6 +30,15 @@ const QUICK_QUESTIONS = [
   'How to improve soil health?',
 ];
 
+const LANG_SPEECH_MAP: Record<string, string> = {
+  en: 'en-IN',
+  hi: 'hi-IN',
+  kn: 'kn-IN',
+  pa: 'pa-IN',
+  te: 'te-IN',
+  mr: 'mr-IN'
+};
+
 export default function AIChatbot() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -37,17 +46,110 @@ export default function AIChatbot() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speakingMsgIndex, setSpeakingMsgIndex] = useState<number | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY ?? '';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, open]);
 
+  // Cleanup speech synthesis on unmount
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  function toggleListening() {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please try Google Chrome.');
+      return;
+    }
+
+    const appLang = localStorage.getItem('lang') ?? 'en';
+    const speechLang = LANG_SPEECH_MAP[appLang] ?? 'en-IN';
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = speechLang;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const text = event.results[0][0].transcript;
+      if (text) {
+        setInput(text);
+      }
+    };
+
+    recognition.onerror = (err: any) => {
+      console.error('Speech recognition error:', err);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }
+
+  function speakText(text: string, index: number) {
+    if ('speechSynthesis' in window) {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        if (speakingMsgIndex === index) {
+          setSpeakingMsgIndex(null);
+          return;
+        }
+      }
+
+      // Clean text from markdown formatting
+      const cleanText = text
+        .replace(/[*_#`~\-+]/g, '')
+        .replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '');
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const appLang = localStorage.getItem('lang') ?? 'en';
+      utterance.lang = LANG_SPEECH_MAP[appLang] ?? 'en-IN';
+
+      utterance.onstart = () => setSpeakingMsgIndex(index);
+      utterance.onend = () => setSpeakingMsgIndex(null);
+      utterance.onerror = () => setSpeakingMsgIndex(null);
+
+      window.speechSynthesis.speak(utterance);
+    } else {
+      alert('Text-to-speech is not supported in this browser.');
+    }
+  }
+
   async function sendMessage(text?: string) {
     const userText = text ?? input.trim();
     if (!userText || loading) return;
     setInput('');
+
+    // Stop speaking if new message is sent
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgIndex(null);
+    }
 
     const newMessages: Message[] = [...messages, { role: 'user', content: userText }];
     setMessages(newMessages);
@@ -63,15 +165,6 @@ export default function AIChatbot() {
     }
 
     try {
-      // Build conversation history for Gemini
-      const contents = [
-        { role: 'user', parts: [{ text: SYSTEM_PROMPT + '\n\nUser: ' + userText }] },
-        ...newMessages.slice(1).map(m => ({
-          role: m.role === 'user' ? 'user' : 'model',
-          parts: [{ text: m.content }]
-        }))
-      ];
-
       const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -108,6 +201,14 @@ export default function AIChatbot() {
 
   return (
     <>
+      <style>{`
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.12); }
+          100% { transform: scale(1); }
+        }
+      `}</style>
+
       {/* Floating Button */}
       <button
         onClick={() => setOpen(o => !o)}
@@ -128,7 +229,7 @@ export default function AIChatbot() {
       {open && (
         <div style={{
           position: 'fixed', bottom: 90, right: 24, zIndex: 999,
-          width: 360, height: 520, background: '#fff',
+          width: 380, height: 550, background: '#fff',
           borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
           border: '1px solid #e0e0e0',
@@ -136,7 +237,7 @@ export default function AIChatbot() {
           {/* Header */}
           <div style={{
             background: 'linear-gradient(135deg, #1b5e20, #2e7d32)',
-            padding: '12px 16px', color: '#fff',
+            padding: '14px 16px', color: '#fff',
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
             <span style={{ fontSize: '1.4rem' }}>🌿</span>
@@ -148,10 +249,12 @@ export default function AIChatbot() {
           </div>
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {messages.map((msg, i) => (
               <div key={i} style={{
-                display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
               }}>
                 <div style={{
                   maxWidth: '85%', padding: '8px 12px', borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
@@ -161,6 +264,18 @@ export default function AIChatbot() {
                 }}>
                   {msg.content}
                 </div>
+                {msg.role === 'assistant' && (
+                  <button
+                    onClick={() => speakText(msg.content, i)}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontSize: '0.75rem', color: '#2e7d32', marginTop: 4, padding: '2px 4px',
+                      display: 'inline-flex', alignItems: 'center', gap: 4
+                    }}
+                  >
+                    {speakingMsgIndex === i ? '🔊 Speaking...' : '🔊 Read Aloud'}
+                  </button>
+                )}
               </div>
             ))}
             {loading && (
@@ -189,15 +304,32 @@ export default function AIChatbot() {
           )}
 
           {/* Input */}
-          <div style={{ padding: '10px 12px', borderTop: '1px solid #eee', display: 'flex', gap: 8 }}>
+          <div style={{ padding: '10px 12px', borderTop: '1px solid #eee', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={toggleListening}
+              style={{
+                background: isListening ? '#e53935' : '#e8f5e9',
+                color: isListening ? '#fff' : '#2e7d32',
+                border: 'none', borderRadius: '50%',
+                width: 36, height: 36, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem',
+                boxShadow: isListening ? '0 0 10px rgba(229,57,53,0.5)' : 'none',
+                transition: 'all 0.2s',
+                animation: isListening ? 'pulse 1.5s infinite' : 'none'
+              }}
+              title={isListening ? 'Stop Listening' : 'Speak to Assistant'}
+            >
+              {isListening ? '🛑' : '🎤'}
+            </button>
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              placeholder="Ask about crops, soil, pests…"
+              placeholder={isListening ? "Listening..." : "Ask about crops, soil, pests…"}
               style={{
                 flex: 1, padding: '8px 12px', borderRadius: 20, border: '1px solid #ddd',
                 fontSize: '0.85rem', outline: 'none',
+                backgroundColor: isListening ? '#ffebee' : '#fff'
               }}
             />
             <button onClick={() => sendMessage()} disabled={loading || !input.trim()}

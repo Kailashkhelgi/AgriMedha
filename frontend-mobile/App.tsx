@@ -11,7 +11,6 @@ import FertilizerScreen from './src/screens/FertilizerScreen';
 import WeatherScreen from './src/screens/WeatherScreen';
 import ImageAnalysisScreen from './src/screens/ImageAnalysisScreen';
 import MarketPriceScreen from './src/screens/MarketPriceScreen';
-import VoiceScreen from './src/screens/VoiceScreen';
 import FeedbackScreen from './src/screens/FeedbackScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 
@@ -25,7 +24,6 @@ type Screen =
   | 'weather'
   | 'image-analysis'
   | 'market-price'
-  | 'voice'
   | 'feedback'
   | 'dashboard';
 
@@ -93,7 +91,6 @@ export default function App() {
       {screen === 'weather' && <WeatherScreen lat={DEMO_LAT} lon={DEMO_LON} onNavigate={navigate} />}
       {screen === 'image-analysis' && <ImageAnalysisScreen onNavigate={navigate} />}
       {screen === 'market-price' && <MarketPriceScreen onNavigate={navigate} />}
-      {screen === 'voice' && <VoiceScreen onNavigate={navigate} />}
       {screen === 'feedback' && (
         <FeedbackScreen sessionId={DEMO_SESSION_ID} onDismiss={() => navigate('home')} />
       )}
@@ -115,7 +112,6 @@ function HomeMenu({ onNavigate }: { onNavigate: (s: string) => void }) {
     { label: '🌤 Weather Alerts', screen: 'weather' },
     { label: '📷 Image Analysis', screen: 'image-analysis' },
     { label: '💰 Market Prices', screen: 'market-price' },
-    { label: '🎤 Voice', screen: 'voice' },
     { label: '⭐ Feedback', screen: 'feedback' },
     { label: '📊 Dashboard', screen: 'dashboard' },
   ];

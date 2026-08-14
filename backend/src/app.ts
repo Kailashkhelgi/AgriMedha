@@ -12,12 +12,12 @@ import advisoryRouter from './routes/advisory';
 import imagesRouter from './routes/images';
 import weatherRouter from './routes/weather';
 import marketPricesRouter from './routes/marketPrices';
-import voiceRouter from './routes/voice';
 import feedbackRouter from './routes/feedback';
 import notificationsRouter from './routes/notifications';
 
 export function createApp(): express.Application {
   const app = express();
+
 
   // ── 1. Body parsing ──────────────────────────────────────────────────────────
   app.use(express.json());
@@ -69,7 +69,6 @@ export function createApp(): express.Application {
   app.use('/api/v1/images', imagesRouter);
   app.use('/api/v1/weather', weatherRouter);
   app.use('/api/v1/market-prices', marketPricesRouter);
-  app.use('/api/v1/voice', voiceRouter);
   app.use('/api/v1/notifications', notificationsRouter);
   // feedbackRouter handles both /feedback and /dashboard/reports
   app.use('/api/v1', feedbackRouter);

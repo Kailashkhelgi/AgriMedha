@@ -7,18 +7,17 @@ Write-Host "🔄 Running PostgreSQL migrations..." -ForegroundColor Cyan
 cd backend
 node migrate.js
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "❌ Database migrations failed. Please check your PostgreSQL connection."
-    exit $LASTEXITCODE
+    Write-Warning "⚠️ Database migrations failed. Proceeding with in-memory fallback storage mode."
 }
 cd ..
 
 # 2. Start Advisory Engine (Python FastAPI)
 Write-Host "🐍 Starting Python Advisory Engine on port 8001..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd advisory-engine; uvicorn main:app --port 8001" -WindowStyle Normal
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd advisory-engine; python -m uvicorn main:app --port 8001" -WindowStyle Normal
 
 # 3. Start Vision Engine (Python FastAPI)
 Write-Host "🐍 Starting Python Vision Engine on port 8002..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd vision-engine; uvicorn main:app --port 8002" -WindowStyle Normal
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd vision-engine; python -m uvicorn main:app --port 8002" -WindowStyle Normal
 
 # 4. Start Node.js API Gateway Backend on port 3000
 Write-Host "🟢 Starting Node.js Backend on port 3000..." -ForegroundColor Green
