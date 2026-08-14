@@ -246,9 +246,12 @@ export async function updateFarmerProfile(
     values.push(updates.landSizeAcres);
   }
 
-  if (setClauses.length === 0) {
-    // Nothing to update — return current profile
-    const current = await query<{
+  // Always bump updated_at
+  setClauses.push(`updated_at = now()`);
+
+  if (setClauses.length > 1) {
+    values.push(farmerId);
+    const result = await query<{
       id: string;
       mobile_number: string;
       name: string | null;
@@ -259,19 +262,19 @@ export async function updateFarmerProfile(
       land_size_acres: string | null;
       created_at: Date;
       updated_at: Date;
-    }>('SELECT * FROM farmers WHERE id = $1', [farmerId]);
+    }>(
+      `UPDATE farmers SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
+    );
 
-    if (current.rows.length === 0) {
-      throw new AppError('NOT_FOUND', 'Farmer not found');
+    if (result.rows.length > 0) {
+      return rowToProfile(result.rows[0]);
     }
-    return rowToProfile(current.rows[0]);
   }
 
-  // Always bump updated_at
-  setClauses.push(`updated_at = now()`);
-  values.push(farmerId);
-
-  const result = await query<{
+  // If row was not updated (didn't exist yet in DB), insert/upsert a new row for this farmerId
+  const mobile = updates.mobileNumber || `user_${farmerId.slice(0, 8)}`;
+  const insertResult = await query<{
     id: string;
     mobile_number: string;
     name: string | null;
@@ -283,15 +286,30 @@ export async function updateFarmerProfile(
     created_at: Date;
     updated_at: Date;
   }>(
-    `UPDATE farmers SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
-    values
+    `INSERT INTO farmers (id, mobile_number, name, preferred_lang, village, district, state, land_size_acres)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (id) DO UPDATE SET
+       name = EXCLUDED.name,
+       preferred_lang = EXCLUDED.preferred_lang,
+       village = EXCLUDED.village,
+       district = EXCLUDED.district,
+       state = EXCLUDED.state,
+       land_size_acres = EXCLUDED.land_size_acres,
+       updated_at = now()
+     RETURNING *`,
+    [
+      farmerId,
+      mobile,
+      updates.name ?? null,
+      updates.preferredLang ?? 'en',
+      updates.village ?? null,
+      updates.district ?? null,
+      updates.state ?? null,
+      updates.landSizeAcres ?? null,
+    ]
   );
 
-  if (result.rows.length === 0) {
-    throw new AppError('NOT_FOUND', 'Farmer not found');
-  }
-
-  return rowToProfile(result.rows[0]);
+  return rowToProfile(insertResult.rows[0]);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
