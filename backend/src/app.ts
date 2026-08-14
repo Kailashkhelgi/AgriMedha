@@ -73,29 +73,40 @@ export function createApp(): express.Application {
   // feedbackRouter handles both /feedback and /dashboard/reports
   app.use('/api/v1', feedbackRouter);
 
-  // ── Farmers profile routes (inline) - In-memory storage for development ─────
+  // ── Farmers profile routes (inline) - Resilient storage handling ───────────
   app.get('/api/v1/farmers/me', async (req: Request, res: Response) => {
     if (!req.farmerId) {
       sendError(res, 401, 'UNAUTHORIZED', 'Authentication required');
       return;
     }
     try {
-      // Try to get from database first, fall back to in-memory users map from auth
+      // Try to get from database first
       try {
         const profile = await getFarmerProfile(req.farmerId);
         sendSuccess(res, profile);
       } catch (dbErr) {
-        // Database not available - use in-memory data from registration
+        // Fall back to in-memory user data
         const authModule = require('./routes/auth');
-        const user = authModule.usersById.get(req.farmerId);
+        let user = authModule.usersById.get(req.farmerId);
         if (!user) {
-          sendError(res, 404, 'NOT_FOUND', 'Farmer profile not found');
-          return;
+          // If not in memory (e.g. server restarted), initialize default profile entry
+          user = {
+            id: req.farmerId,
+            mobileNumber: '',
+            password: '',
+            name: '',
+            preferredLang: 'en',
+            village: '',
+            district: '',
+            state: '',
+            landSizeAcres: 0
+          };
+          authModule.usersById.set(req.farmerId, user);
         }
-        // Return basic profile from in-memory user data
+        // Return profile from in-memory user data
         sendSuccess(res, {
           id: req.farmerId,
-          mobileNumber: user.mobileNumber,
+          mobileNumber: user.mobileNumber || '',
           name: user.name || '',
           preferredLang: user.preferredLang || 'en',
           village: user.village || '',
@@ -125,10 +136,20 @@ export function createApp(): express.Application {
         // Database not available - update in-memory user data
         const authModule = require('./routes/auth');
         const { saveUsers } = require('./storage');
-        const user = authModule.usersById.get(req.farmerId);
+        let user = authModule.usersById.get(req.farmerId);
         if (!user) {
-          sendError(res, 404, 'NOT_FOUND', 'Farmer profile not found');
-          return;
+          user = {
+            id: req.farmerId,
+            mobileNumber: '',
+            password: '',
+            name: '',
+            preferredLang: 'en',
+            village: '',
+            district: '',
+            state: '',
+            landSizeAcres: 0
+          };
+          authModule.usersById.set(req.farmerId, user);
         }
         // Update in-memory user data
         if (req.body.name !== undefined) user.name = req.body.name;

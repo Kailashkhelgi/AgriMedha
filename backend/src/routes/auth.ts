@@ -68,6 +68,17 @@ router.post('/register', async (req: Request, res: Response) => {
     // Save to persistent storage
     saveUsers(users, usersById);
 
+    // Try to sync with PostgreSQL if available
+    try {
+      const { query } = require('../db');
+      await query(
+        `INSERT INTO farmers (id, mobile_number, preferred_lang) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
+        [farmerId, mobileNumber, 'en']
+      );
+    } catch (e) {
+      // Database not available or table not migrated yet
+    }
+
     // Issue JWT tokens
     const accessToken = jwt.sign({ sub: farmerId }, config.jwtSecret, { expiresIn: '1h' });
     const refreshToken = uuidv4();
@@ -113,6 +124,17 @@ router.post('/login', async (req: Request, res: Response) => {
     if (!usersById.has(user.id)) {
       usersById.set(user.id, user);
       saveUsers(users, usersById);
+    }
+
+    // Try to sync with PostgreSQL if available
+    try {
+      const { query } = require('../db');
+      await query(
+        `INSERT INTO farmers (id, mobile_number, preferred_lang) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
+        [user.id, user.mobileNumber, user.preferredLang || 'en']
+      );
+    } catch (e) {
+      // Database not available or table not migrated yet
     }
 
     sendSuccess(res, { accessToken, refreshToken, farmerId: user.id });
