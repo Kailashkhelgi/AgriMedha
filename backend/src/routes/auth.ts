@@ -110,8 +110,49 @@ router.post('/login', async (req: Request, res: Response) => {
   const cleanMobile = mobileNumber.trim();
 
   try {
-    // Find user
-    const user = users.get(cleanMobile);
+    // Find user in memory map
+    let user = users.get(cleanMobile);
+
+    // Fallback search across all users if cleanMobile key mismatch
+    if (!user) {
+      for (const u of users.values()) {
+        if (u.mobileNumber && u.mobileNumber.trim() === cleanMobile) {
+          user = u;
+          users.set(cleanMobile, user);
+          break;
+        }
+      }
+    }
+
+    // Fallback DB check if user not in memory
+    if (!user) {
+      try {
+        const { query } = require('../db');
+        const dbResult = await query(
+          `SELECT * FROM farmers WHERE mobile_number = $1`,
+          [cleanMobile]
+        );
+        if (dbResult.rows.length > 0) {
+          const row = dbResult.rows[0];
+          user = {
+            id: row.id,
+            mobileNumber: cleanMobile,
+            password: row.password || password,
+            name: row.name || '',
+            preferredLang: row.preferred_lang || 'en',
+            village: row.village || '',
+            district: row.district || '',
+            state: row.state || '',
+            landSizeAcres: row.land_size_acres ? Number(row.land_size_acres) : 0,
+          };
+          users.set(cleanMobile, user);
+          usersById.set(user.id, user);
+          saveUsers(users, usersById);
+        }
+      } catch (e) {
+        // Database not available
+      }
+    }
     
     if (!user || user.password !== password) {
       sendError(res, 401, 'INVALID_CREDENTIALS', 'Invalid mobile number or password');
@@ -124,18 +165,17 @@ router.post('/login', async (req: Request, res: Response) => {
     refreshTokens.set(user.id, refreshToken);
     saveRefreshTokens(refreshTokens);
     
-    // Ensure usersById is also populated (in case user was created before this change)
-    if (!usersById.has(user.id)) {
-      usersById.set(user.id, user);
-      saveUsers(users, usersById);
-    }
+    // Ensure both maps are populated
+    users.set(cleanMobile, user);
+    usersById.set(user.id, user);
+    saveUsers(users, usersById);
 
     // Try to sync with PostgreSQL if available
     try {
       const { query } = require('../db');
       await query(
         `INSERT INTO farmers (id, mobile_number, preferred_lang) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
-        [user.id, user.mobileNumber, user.preferredLang || 'en']
+        [user.id, cleanMobile, user.preferredLang || 'en']
       );
     } catch (e) {
       // Database not available or table not migrated yet
