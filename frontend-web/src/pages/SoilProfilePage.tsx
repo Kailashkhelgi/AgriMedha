@@ -106,12 +106,13 @@ const SoilProfilePage: React.FC<SoilProfilePageProps> = ({ profileId, onNavigate
 
   const isEdit = Boolean(profileId);
 
-  const detectLocation = () => {
+  const detectLocation = (isAuto = false) => {
     if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser.');
+      if (!isAuto) setError('Geolocation is not supported by your browser.');
       return;
     }
     setLocating(true);
+    if (!isAuto) setError('');
     setLocationLabel('');
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -139,10 +140,12 @@ const SoilProfilePage: React.FC<SoilProfilePageProps> = ({ profileId, onNavigate
       },
       (err) => {
         setLocating(false);
-        if (err.code === err.PERMISSION_DENIED) {
-          setError('Location permission denied. Please allow location access in your browser.');
-        } else {
-          setError('Unable to detect location. Please enter coordinates manually.');
+        if (!isAuto) {
+          if (err.code === err.PERMISSION_DENIED) {
+            setError('Location permission denied. Please allow location access in your browser.');
+          } else {
+            setError('Unable to detect location. Please enter coordinates manually.');
+          }
         }
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -151,8 +154,8 @@ const SoilProfilePage: React.FC<SoilProfilePageProps> = ({ profileId, onNavigate
 
   useEffect(() => {
     if (!profileId) {
-      // Auto-detect live location on mount for new profiles
-      detectLocation();
+      // Auto-detect live location on mount silently for new profiles
+      detectLocation(true);
       return;
     }
     setLoading(true);

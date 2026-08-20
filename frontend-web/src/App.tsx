@@ -215,13 +215,14 @@ function LandingPage({ navigate, onLoginSuccess }: { navigate: (p: string) => vo
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobileNumber: mobile, password }),
+        body: JSON.stringify({ mobileNumber: mobile.trim(), password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.message ?? data?.message ?? 'Failed');
       localStorage.setItem('accessToken', data.data.accessToken);
       localStorage.setItem('refreshToken', data.data.refreshToken);
       localStorage.setItem('farmerId', data.data.farmerId);
+      localStorage.setItem('userMobile', mobile.trim());
       // Save credentials if Remember Me is checked
       if (rememberMe) {
         localStorage.setItem('savedMobile', mobile);

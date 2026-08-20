@@ -5,7 +5,8 @@ const isLocal = config.databaseUrl?.includes('localhost') || config.databaseUrl?
 
 export const pool = new Pool({
   connectionString: config.databaseUrl,
-  ssl: isLocal ? false : { rejectUnauthorized: false }
+  ssl: isLocal ? false : { rejectUnauthorized: false },
+  connectionTimeoutMillis: 1500,
 });
 
 export async function query<T extends QueryResultRow = QueryResultRow>(

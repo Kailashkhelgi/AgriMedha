@@ -42,9 +42,11 @@ router.post('/register', async (req: Request, res: Response) => {
     return;
   }
 
+  const cleanMobile = mobileNumber.trim();
+
   try {
     // Check if user already exists
-    if (users.has(mobileNumber)) {
+    if (users.has(cleanMobile)) {
       sendError(res, 400, 'USER_EXISTS', 'User with this mobile number already exists');
       return;
     }
@@ -53,7 +55,7 @@ router.post('/register', async (req: Request, res: Response) => {
     const farmerId = uuidv4();
     const userData = { 
       id: farmerId, 
-      mobileNumber,
+      mobileNumber: cleanMobile,
       password,
       name: '',
       preferredLang: 'en',
@@ -62,7 +64,7 @@ router.post('/register', async (req: Request, res: Response) => {
       state: '',
       landSizeAcres: 0
     };
-    users.set(mobileNumber, userData);
+    users.set(cleanMobile, userData);
     usersById.set(farmerId, userData);
 
     // Save to persistent storage
@@ -73,7 +75,7 @@ router.post('/register', async (req: Request, res: Response) => {
       const { query } = require('../db');
       await query(
         `INSERT INTO farmers (id, mobile_number, preferred_lang) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
-        [farmerId, mobileNumber, 'en']
+        [farmerId, cleanMobile, 'en']
       );
     } catch (e) {
       // Database not available or table not migrated yet
@@ -105,9 +107,11 @@ router.post('/login', async (req: Request, res: Response) => {
     return;
   }
 
+  const cleanMobile = mobileNumber.trim();
+
   try {
     // Find user
-    const user = users.get(mobileNumber);
+    const user = users.get(cleanMobile);
     
     if (!user || user.password !== password) {
       sendError(res, 401, 'INVALID_CREDENTIALS', 'Invalid mobile number or password');

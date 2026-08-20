@@ -6,8 +6,8 @@ interface ProfilePageProps {
 }
 
 export default function ProfilePage({ onNavigate }: ProfilePageProps) {
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [farmerId, setFarmerId] = useState('');
+  const [mobileNumber, setMobileNumber] = useState(() => localStorage.getItem('userMobile') || localStorage.getItem('savedMobile') || '');
+  const [farmerId, setFarmerId] = useState(() => localStorage.getItem('farmerId') || '');
   const [form, setForm] = useState({
     name: '', preferredLang: 'en', village: '', district: '', state: '', landSizeAcres: '',
   });
@@ -20,8 +20,8 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
     farmerApi.getProfile()
       .then(res => {
         const d = res.data?.data ?? res.data;
-        setMobileNumber(d.mobileNumber ?? '');
-        setFarmerId(d.id ?? localStorage.getItem('farmerId') ?? '');
+        if (d.mobileNumber) setMobileNumber(d.mobileNumber);
+        if (d.id) setFarmerId(d.id);
         setForm({
           name: d.name ?? '',
           preferredLang: d.preferredLang ?? 'en',
@@ -31,11 +31,12 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
           landSizeAcres: d.landSizeAcres != null ? String(d.landSizeAcres) : '',
         });
       })
-      .catch(err => {
+      .catch((err: any) => {
+        const status = err?.response?.status;
         const msg = err?.response?.data?.error?.message
           ?? err?.response?.data?.message
-          ?? (err?.response?.status === 401 ? 'Session expired. Please log out and log in again.' : 'Failed to load profile.')
-        setError(msg);
+          ?? (status === 401 ? 'Session expired. Please log out and log in again.' : '');
+        if (msg) setError(msg);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -51,12 +52,19 @@ export default function ProfilePage({ onNavigate }: ProfilePageProps) {
       });
       setSuccess('Profile updated successfully.');
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: { message?: string } | string; message?: string } } };
+      const e = err as { response?: { status?: number; data?: { error?: { message?: string } | string; message?: string } } };
+      const status = e.response?.status;
       const errBody = e.response?.data?.error;
-      const msg = typeof errBody === 'object' ? errBody?.message
+      let msg = typeof errBody === 'object' ? errBody?.message
         : typeof errBody === 'string' ? errBody
-        : e.response?.data?.message ?? 'Failed to save profile.';
-      setError(msg ?? 'Failed to save profile.');
+        : e.response?.data?.message;
+
+      if (status === 401) {
+        msg = 'Session expired. Please log out and log in again to save changes.';
+      } else if (!msg) {
+        msg = 'Failed to save profile. Please ensure the backend server is running.';
+      }
+      setError(msg);
     } finally {
       setSaving(false);
     }

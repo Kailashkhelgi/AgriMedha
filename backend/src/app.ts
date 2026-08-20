@@ -80,45 +80,62 @@ export function createApp(): express.Application {
       return;
     }
     try {
-      // Try to get from database first
+      const authModule = require('./routes/auth');
+      const { saveUsers } = require('./storage');
+      
+      // Try to get from database first if available
       try {
         const profile = await getFarmerProfile(req.farmerId);
         sendSuccess(res, profile);
-      } catch (dbErr) {
-        // Fall back to in-memory user data
-        const authModule = require('./routes/auth');
-        let user = authModule.usersById.get(req.farmerId);
-        if (!user) {
-          // If not in memory (e.g. server restarted), initialize default profile entry
-          user = {
-            id: req.farmerId,
-            mobileNumber: '',
-            password: '',
-            name: '',
-            preferredLang: 'en',
-            village: '',
-            district: '',
-            state: '',
-            landSizeAcres: 0
-          };
-          authModule.usersById.set(req.farmerId, user);
-        }
-        // Return profile from in-memory user data
-        sendSuccess(res, {
-          id: req.farmerId,
-          mobileNumber: user.mobileNumber || '',
-          name: user.name || '',
-          preferredLang: user.preferredLang || 'en',
-          village: user.village || '',
-          district: user.district || '',
-          state: user.state || '',
-          landSizeAcres: user.landSizeAcres || 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        return;
+      } catch (_dbErr) {
+        // Fall back to persistent storage
       }
+
+      // Search usersById first, then users map
+      let user = authModule.usersById.get(req.farmerId);
+      if (!user) {
+        for (const u of authModule.users.values()) {
+          if (u.id === req.farmerId) {
+            user = u;
+            authModule.usersById.set(req.farmerId, user);
+            break;
+          }
+        }
+      }
+
+      if (!user) {
+        // Create default record if farmer ID is valid JWT subject
+        user = {
+          id: req.farmerId,
+          mobileNumber: '',
+          password: '',
+          name: '',
+          preferredLang: 'en',
+          village: '',
+          district: '',
+          state: '',
+          landSizeAcres: 0
+        };
+        authModule.usersById.set(req.farmerId, user);
+        saveUsers(authModule.users, authModule.usersById);
+      }
+
+      sendSuccess(res, {
+        id: req.farmerId,
+        mobileNumber: user.mobileNumber || '',
+        name: user.name || '',
+        preferredLang: user.preferredLang || 'en',
+        village: user.village || '',
+        district: user.district || '',
+        state: user.state || '',
+        landSizeAcres: user.landSizeAcres || 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
     } catch (err) {
-      sendError(res, 500, 'INTERNAL_ERROR', 'An unexpected error occurred');
+      console.error('Profile GET error:', err);
+      sendError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve profile');
     }
   });
 
@@ -128,55 +145,74 @@ export function createApp(): express.Application {
       return;
     }
     try {
-      // Try database first, fall back to in-memory
+      const authModule = require('./routes/auth');
+      const { saveUsers } = require('./storage');
+
+      // Try database first if available
       try {
         const updated = await updateFarmerProfile(req.farmerId, req.body);
         sendSuccess(res, updated);
-      } catch (dbErr) {
-        // Database not available - update in-memory user data
-        const authModule = require('./routes/auth');
-        const { saveUsers } = require('./storage');
-        let user = authModule.usersById.get(req.farmerId);
-        if (!user) {
-          user = {
-            id: req.farmerId,
-            mobileNumber: '',
-            password: '',
-            name: '',
-            preferredLang: 'en',
-            village: '',
-            district: '',
-            state: '',
-            landSizeAcres: 0
-          };
-          authModule.usersById.set(req.farmerId, user);
-        }
-        // Update in-memory user data
-        if (req.body.name !== undefined) user.name = req.body.name;
-        if (req.body.preferredLang !== undefined) user.preferredLang = req.body.preferredLang;
-        if (req.body.village !== undefined) user.village = req.body.village;
-        if (req.body.district !== undefined) user.district = req.body.district;
-        if (req.body.state !== undefined) user.state = req.body.state;
-        if (req.body.landSizeAcres !== undefined) user.landSizeAcres = req.body.landSizeAcres;
-        
-        // Save to persistent storage
-        saveUsers(authModule.users, authModule.usersById);
-        
-        sendSuccess(res, {
-          id: req.farmerId,
-          mobileNumber: user.mobileNumber,
-          name: user.name || '',
-          preferredLang: user.preferredLang || 'en',
-          village: user.village || '',
-          district: user.district || '',
-          state: user.state || '',
-          landSizeAcres: user.landSizeAcres || 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        return;
+      } catch (_dbErr) {
+        // Fall back to persistent storage
       }
+
+      let user = authModule.usersById.get(req.farmerId);
+      if (!user) {
+        for (const u of authModule.users.values()) {
+          if (u.id === req.farmerId) {
+            user = u;
+            break;
+          }
+        }
+      }
+
+      if (!user) {
+        user = {
+          id: req.farmerId,
+          mobileNumber: '',
+          password: '',
+          name: '',
+          preferredLang: 'en',
+          village: '',
+          district: '',
+          state: '',
+          landSizeAcres: 0
+        };
+      }
+
+      // Update user fields
+      if (req.body.name !== undefined) user.name = String(req.body.name);
+      if (req.body.preferredLang !== undefined) user.preferredLang = String(req.body.preferredLang);
+      if (req.body.village !== undefined) user.village = String(req.body.village);
+      if (req.body.district !== undefined) user.district = String(req.body.district);
+      if (req.body.state !== undefined) user.state = String(req.body.state);
+      if (req.body.landSizeAcres !== undefined && req.body.landSizeAcres !== null) {
+        user.landSizeAcres = Number(req.body.landSizeAcres) || 0;
+      }
+
+      authModule.usersById.set(req.farmerId, user);
+      if (user.mobileNumber) {
+        authModule.users.set(user.mobileNumber, user);
+      }
+
+      saveUsers(authModule.users, authModule.usersById);
+
+      sendSuccess(res, {
+        id: req.farmerId,
+        mobileNumber: user.mobileNumber || '',
+        name: user.name || '',
+        preferredLang: user.preferredLang || 'en',
+        village: user.village || '',
+        district: user.district || '',
+        state: user.state || '',
+        landSizeAcres: user.landSizeAcres || 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
     } catch (err) {
-      sendError(res, 500, 'INTERNAL_ERROR', 'An unexpected error occurred');
+      console.error('Profile PUT error:', err);
+      sendError(res, 500, 'INTERNAL_ERROR', 'Failed to save profile');
     }
   });
 

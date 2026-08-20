@@ -54,6 +54,7 @@ export default function RegisterPage({ onNavigate, mode = 'register' }: Props) {
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('farmerId', farmerId);
+      localStorage.setItem('userMobile', mobileVal.trim());
       if (rememberMe) {
         localStorage.setItem('savedMobile', mobileVal.trim());
         localStorage.setItem('savedPassword', passwordVal);
