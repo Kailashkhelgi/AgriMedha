@@ -1,9 +1,20 @@
 /// <reference types="vite/client" />
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
-// NOTE: No API keys are embedded here. All secrets live in backend environment variables.
+const PROD_BACKEND = 'https://smart-crop-advisory-backend-gur9.onrender.com/api/v1';
+
+export function getApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
+    let url = envUrl.trim().replace(/\/+$/, '');
+    if (!url.endsWith('/api/v1')) url = `${url}/api/v1`;
+    return url;
+  }
+  return PROD_BACKEND;
+}
+
 const apiClient: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1',
+  baseURL: getApiBaseUrl(),
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -16,7 +27,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// Handle 401 responses: attempt token refresh, then retry original request
+// Handle errors: auto-fallback to cloud backend on network error, and token refresh on 401
 let isRefreshing = false;
 let pendingQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
 
@@ -28,7 +39,14 @@ function processQueue(error: unknown, token: string | null) {
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
-    const originalRequest: AxiosRequestConfig & { _retry?: boolean } = error.config;
+    const originalRequest: AxiosRequestConfig & { _retry?: boolean; _fallbackTried?: boolean } = error.config || {};
+
+    // Auto-fallback to live production cloud backend if local server is unreachable
+    if (!error.response && !originalRequest._fallbackTried && apiClient.defaults.baseURL !== PROD_BACKEND) {
+      originalRequest._fallbackTried = true;
+      apiClient.defaults.baseURL = PROD_BACKEND;
+      return apiClient(originalRequest);
+    }
 
     if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
@@ -56,7 +74,7 @@ apiClient.interceptors.response.use(
 
     try {
       const { data } = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/auth/refresh`,
+        `${apiClient.defaults.baseURL}/auth/refresh`,
         { farmerId, refreshToken },
       );
       const newAccessToken: string = data.data.accessToken;
@@ -69,7 +87,6 @@ apiClient.interceptors.response.use(
     } catch (refreshError) {
       processQueue(refreshError, null);
       localStorage.clear();
-      // Don't hard redirect — let the app handle it via state
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
