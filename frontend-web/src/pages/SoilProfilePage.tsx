@@ -123,16 +123,21 @@ const SoilProfilePage: React.FC<SoilProfilePageProps> = ({ profileId, onNavigate
         // Reverse geocode using OpenStreetMap Nominatim (free, no key needed)
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+            { headers: { 'Accept': 'application/json' } }
           );
-          const data = await res.json();
-          const addr = data.address;
-          const label = [
-            addr.village || addr.town || addr.city || addr.county,
-            addr.state_district || addr.district,
-            addr.state,
-          ].filter(Boolean).join(', ');
-          setLocationLabel(label || `${lat}, ${lon}`);
+          if (res.ok) {
+            const data = await res.json();
+            const addr = data?.address || {};
+            const label = [
+              addr.village || addr.town || addr.city || addr.suburb || addr.county,
+              addr.state_district || addr.district,
+              addr.state,
+            ].filter(Boolean).join(', ');
+            setLocationLabel(label || `${lat}, ${lon}`);
+          } else {
+            setLocationLabel(`${lat}, ${lon}`);
+          }
         } catch {
           setLocationLabel(`${lat}, ${lon}`);
         }

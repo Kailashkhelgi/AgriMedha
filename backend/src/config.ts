@@ -17,6 +17,7 @@ const OPTIONAL_ENV_VARS = [
   'FCM_SERVER_KEY',
   'ADVISORY_ENGINE_URL',
   'VISION_ENGINE_URL',
+  'GEMINI_API_KEY',
 ] as const;
 
 for (const name of REQUIRED_ENV_VARS) {
@@ -48,6 +49,7 @@ export const config = {
   fcmServerKey: process.env['FCM_SERVER_KEY'] || '',
   advisoryEngineUrl: process.env['ADVISORY_ENGINE_URL'] || '',
   visionEngineUrl: process.env['VISION_ENGINE_URL'] || '',
+  geminiApiKey: process.env['GEMINI_API_KEY'] || '',
 } as const;
 
 export type Config = typeof config;

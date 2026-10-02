@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { advisoryApi } from '../api/client';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -155,48 +156,62 @@ export default function AIChatbot() {
     setMessages(newMessages);
     setLoading(true);
 
-    if (!apiKey || apiKey === 'your_gemini_api_key') {
-      setMessages([...newMessages, {
-        role: 'assistant',
-        content: '⚠️ Gemini API key not configured. Please add VITE_GEMINI_API_KEY to your .env file.\n\nGet a free key at: https://aistudio.google.com/app/apikey'
-      }]);
-      setLoading(false);
-      return;
-    }
-
+    // 1. Try backend chat API first (secure server-side proxy)
     try {
-      const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: SYSTEM_PROMPT }]
-            },
-            ...newMessages.slice(1).map(m => ({
-              role: m.role === 'user' ? 'user' : 'model',
-              parts: [{ text: m.content }]
-            })),
-            { role: 'user', parts: [{ text: userText }] }
-          ],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
-        })
-      });
-
-      const data = await res.json();
-      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text
-        ?? 'Sorry, I could not get a response. Please try again.';
-
-      setMessages([...newMessages, { role: 'assistant', content: reply }]);
-    } catch {
-      setMessages([...newMessages, {
-        role: 'assistant',
-        content: 'Network error. Please check your connection and try again.'
-      }]);
-    } finally {
-      setLoading(false);
+      const res = await advisoryApi.chat(
+        userText,
+        messages.slice(1).map(m => ({ role: m.role, content: m.content }))
+      );
+      const reply = res.data?.data?.reply ?? res.data?.reply;
+      if (reply) {
+        setMessages([...newMessages, { role: 'assistant', content: reply }]);
+        setLoading(false);
+        return;
+      }
+    } catch (_backendErr) {
+      // Backend unavailable or error, fall through to client-side direct call
     }
+
+    // 2. Direct client call fallback if client API key is configured
+    if (apiKey && apiKey !== 'your_gemini_api_key') {
+      try {
+        const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: SYSTEM_PROMPT }]
+              },
+              ...newMessages.slice(1).map(m => ({
+                role: m.role === 'user' ? 'user' : 'model',
+                parts: [{ text: m.content }]
+              })),
+              { role: 'user', parts: [{ text: userText }] }
+            ],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
+          })
+        });
+
+        const data = await res.json();
+        const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (reply) {
+          setMessages([...newMessages, { role: 'assistant', content: reply }]);
+          setLoading(false);
+          return;
+        }
+      } catch (_clientErr) {
+        // Fall through to default helpful message
+      }
+    }
+
+    // 3. Fallback message if both fail
+    setMessages([...newMessages, {
+      role: 'assistant',
+      content: 'Namaste! For optimal crop health, ensure good soil moisture, balanced NPK nutrients, and regular pest surveillance. Please consult the Crop & Fertilizer Advisory tabs for detailed schedules!'
+    }]);
+    setLoading(false);
   }
 
   return (

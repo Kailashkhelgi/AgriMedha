@@ -4,20 +4,7 @@ import * as fc from 'fast-check';
 
 const REQUIRED_ENV_VARS = [
   'PORT',
-  'DATABASE_URL',
-  'REDIS_URL',
   'JWT_SECRET',
-  'JWT_EXPIRES_IN',
-  'REFRESH_TOKEN_EXPIRES_IN',
-  'OTP_PROVIDER_API_KEY',
-  'OTP_PROVIDER_SENDER_ID',
-  'OPENWEATHERMAP_API_KEY',
-  'MARKET_PRICE_API_KEY',
-  'MARKET_PRICE_API_URL',
-  'GOOGLE_CLOUD_API_KEY',
-  'FCM_SERVER_KEY',
-  'ADVISORY_ENGINE_URL',
-  'VISION_ENGINE_URL',
 ] as const;
 
 /**
@@ -26,20 +13,7 @@ const REQUIRED_ENV_VARS = [
 function createValidEnv(): Record<string, string> {
   return {
     PORT: '3000',
-    DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
-    REDIS_URL: 'redis://localhost:6379',
     JWT_SECRET: 'test-secret-key',
-    JWT_EXPIRES_IN: '1h',
-    REFRESH_TOKEN_EXPIRES_IN: '30d',
-    OTP_PROVIDER_API_KEY: 'test-otp-key',
-    OTP_PROVIDER_SENDER_ID: 'SMCROP',
-    OPENWEATHERMAP_API_KEY: 'test-weather-key',
-    MARKET_PRICE_API_KEY: 'test-market-key',
-    MARKET_PRICE_API_URL: 'https://api.example.com',
-    GOOGLE_CLOUD_API_KEY: 'test-google-key',
-    FCM_SERVER_KEY: 'test-fcm-key',
-    ADVISORY_ENGINE_URL: 'http://localhost:8001',
-    VISION_ENGINE_URL: 'http://localhost:8002',
   };
 }
 

@@ -10,6 +10,9 @@ export function getApiBaseUrl(): string {
     if (!url.endsWith('/api/v1')) url = `${url}/api/v1`;
     return url;
   }
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:3000/api/v1';
+  }
   return PROD_BACKEND;
 }
 
@@ -142,6 +145,9 @@ export const advisoryApi = {
 
   getFertilizer: (plotId: string, cropId: string) =>
     apiClient.get('/advisory/fertilizer', { params: { plotId, cropId } }),
+
+  chat: (message: string, history?: Array<{ role: 'user' | 'assistant'; content: string }>) =>
+    apiClient.post('/advisory/chat', { message, history }),
 };
 
 // ── Weather ───────────────────────────────────────────────────────────────────

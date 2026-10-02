@@ -10,7 +10,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "test": "jest --runInBand",
+    "test": "jest --runInBand --forceExit",
     "test:run": "jest --runInBand --forceExit"
   },
   "dependencies": {
